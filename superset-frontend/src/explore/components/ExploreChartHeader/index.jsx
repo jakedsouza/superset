@@ -20,7 +20,12 @@ import React from 'react';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
-import { styled, t } from '@superset-ui/core';
+import {
+  styled,
+  t,
+  SupersetClient,
+  CategoricalColorNamespace,
+} from '@superset-ui/core';
 import { Tooltip } from 'src/components/Tooltip';
 import { toggleActive, deleteActiveReport } from 'src/reports/actions/reports';
 import HeaderReportActionsDropdown from 'src/components/ReportModal/HeaderReportActionsDropdown';
@@ -105,6 +110,38 @@ export class ExploreChartHeader extends React.PureComponent {
     };
     this.openPropertiesModal = this.openPropertiesModal.bind(this);
     this.closePropertiesModal = this.closePropertiesModal.bind(this);
+    this.fetchChartDashboardData = this.fetchChartDashboardData.bind(this);
+  }
+
+  componentDidMount() {
+    const { dashboardId } = this.props;
+    if (dashboardId) {
+      this.fetchChartDashboardData();
+    }
+  }
+
+  async fetchChartDashboardData() {
+    const { dashboardId, slice } = this.props;
+    const response = await SupersetClient.get({
+      endpoint: `/api/v1/chart/${slice.slice_id}`,
+    });
+    const chart = response.json.result;
+    const dashboards = chart.dashboards || [];
+    const dashboard =
+      dashboardId &&
+      dashboards.length &&
+      dashboards.find(d => d.id === dashboardId);
+
+    if (dashboard && dashboard.json_metadata) {
+      // setting the chart to use the dashboard custom label colors if any
+      const labelColors =
+        JSON.parse(dashboard.json_metadata).label_colors || {};
+      const categoricalNamespace = CategoricalColorNamespace.getNamespace();
+
+      Object.keys(labelColors).forEach(label => {
+        categoricalNamespace.setColor(label, labelColors[label]);
+      });
+    }
   }
 
   getSliceName() {
